@@ -40,18 +40,38 @@ module Oga
     class Lexer
       attr_reader :html
 
-      # @return [String]
-      HTML_SCRIPT = 'script'
+      # These are all constant/frozen to remove the need for String allocations
+      # every time they are referenced in the lexer.
 
-      # @return [String]
-      HTML_STYLE = 'style'
+      HTML_SCRIPT = 'script'.freeze
+      HTML_STYLE  = 'style'.freeze
+      HTML_ROOT   = 'html'.freeze
+      HTML_HEAD   = 'head'.freeze
+      HTML_BODY   = 'body'.freeze
+
+      ##
+      # The tags that can occur inside an <html> tag.
+      #
+      HTML_ROOT_CHILDREN = NodeNameSet.new(%w{head body})
+
+      ##
+      # The tags that can occur inside a <head> tag.
+      #
+      HTML_HEAD_CHILDREN = NodeNameSet.new(
+        %w{base link meta noscript script style template title}
+      )
+
+      ##
+      # Hash that specifies what HTML open tags should close tags that are
+      # currently open.
+      #
+      HTML_CLOSE_CURRENT = {
+      }
 
       ##
       # Names of HTML tags of which the content should be lexed as-is.
       #
-      # @return [Array]
-      #
-      LITERAL_HTML_ELEMENTS = [HTML_SCRIPT, HTML_STYLE]
+      LITERAL_HTML_ELEMENTS = NodeNameSet.new([HTML_SCRIPT, HTML_STYLE])
 
       ##
       # @param [String|IO] data The data to lex. This can either be a String or
@@ -375,6 +395,32 @@ module Oga
       # @param [String] name The name of the element, including namespace.
       #
       def on_element_name(name)
+        before_html_element_name(name) if html?
+
+        add_element(name)
+      end
+
+      ##
+      # Handles inserting of any missing tags whenever a new HTML tag is opened.
+      #
+      # @param [String] name
+      #
+      def before_html_element_name(name)
+        # <head> and other tags at the top-level.
+        if @elements.empty? and name != HTML_ROOT
+          add_element(HTML_ROOT.dup)
+        end
+
+        # <title>, <meta> or other tags directly inside an <html> tag.
+        if current_element == HTML_ROOT and HTML_HEAD_CHILDREN.include?(name)
+          add_element(HTML_HEAD.dup)
+        end
+      end
+
+      ##
+      # @param [String] name
+      #
+      def add_element(name)
         @elements << name
 
         add_token(:T_ELEM_NAME, name)
