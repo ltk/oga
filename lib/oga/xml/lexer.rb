@@ -415,6 +415,11 @@ module Oga
         if current_element == HTML_ROOT and HTML_HEAD_CHILDREN.include?(name)
           add_element(HTML_HEAD.dup)
         end
+
+        # a <body> tag following a unclosed <head> tag
+        if current_element == HTML_HEAD and HTML_ROOT_CHILDREN.include?(name)
+          on_element_end
+        end
       end
 
       ##
